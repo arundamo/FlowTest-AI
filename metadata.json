@@ -1,0 +1,6 @@
+{
+  "name": "Playwright Agent Studio",
+  "description": "SaaS platform wrapping Playwright Test Agents (Planner, Generator, Healer) with on-premise LLM routing and human-in-the-loop spec approvals.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
