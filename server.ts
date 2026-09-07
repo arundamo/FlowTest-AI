@@ -266,8 +266,10 @@ async function startServer() {
         specFilePath,
         specCode,
         llmConfig,
+        headless,
       } = req.body;
 
+      const isHeadless = headless !== undefined ? !!headless : true;
       const job = jobId ? jobManager.getJob(jobId) : null;
       const effectiveUrl = targetUrl || job?.targetUrl || 'https://example.com';
       const effectiveConfig = llmConfig || job?.llmConfig;
@@ -283,7 +285,7 @@ async function startServer() {
         jobManager.setJobStatus(jobId, 'executing_test');
         jobManager.addLog(
           jobId,
-          `[Phase 3 Runner] Initiating test execution with Self-Healing ${selfHealingEnabled !== false ? 'ENABLED' : 'DISABLED'}`,
+          `[Phase 3 Runner] Initiating test execution in ${isHeadless ? 'HEADLESS' : 'HEADED (Live Browser)'} mode with Self-Healing ${selfHealingEnabled !== false ? 'ENABLED' : 'DISABLED'}`,
           'info'
         );
       }
@@ -297,6 +299,7 @@ async function startServer() {
         llmConfig: effectiveConfig,
         selfHealingEnabled: selfHealingEnabled !== false,
         simulateFailureScenario: !!simulateFailureScenario,
+        headless: isHeadless,
         onLog: (msg, level) => {
           if (jobId) {
             jobManager.addLog(jobId, msg, level || 'info');

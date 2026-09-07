@@ -26,6 +26,7 @@ export interface TestRunOptions {
   llmConfig?: LLMConfig;
   selfHealingEnabled?: boolean;
   simulateFailureScenario?: boolean;
+  headless?: boolean; // When false, runs in non-headless (headed) browser mode
   onLog?: (msg: string, level?: 'info' | 'warn' | 'error') => void;
 }
 
@@ -71,8 +72,12 @@ export async function runPlaywrightTestEngine(options: TestRunOptions): Promise<
     terminalStreamService.broadcastToJob(jobId, msg, level);
   };
 
+  const isHeadless = options.headless !== false;
+  const executionMode: 'headless' | 'headed' = isHeadless ? 'headless' : 'headed';
+
   log(`[Phase 3: Playwright Execution Engine] Starting runner for: ${specFileName}`);
   log(`[Phase 3: Playwright Execution Engine] Target Application: ${targetUrl}`);
+  log(`[Phase 3: Playwright Execution Engine] Execution Mode: \x1b[36m${isHeadless ? 'HEADLESS (Silent Background)' : 'HEADED / NON-HEADLESS (Interactive Browser View)'}\x1b[0m`);
   log(`[Phase 3: Playwright Execution Engine] Self-Healing Engine: \x1b[32m${selfHealingEnabled ? 'ACTIVE' : 'DISABLED'}\x1b[0m`);
   if (simulateFailure) {
     log(`[Phase 3: Playwright Execution Engine] \x1b[33m[DEMO MODE] Injected outdated selector simulation enabled to verify Healer Agent\x1b[0m`, 'warn');
@@ -83,9 +88,15 @@ export async function runPlaywrightTestEngine(options: TestRunOptions): Promise<
   log(`[Phase 3: Spec Parser] Extracted ${parsedSteps.length} discrete test verification steps from AST.`);
 
   // Browser launch initialization
-  await sleep(350);
-  log(`[Browser Automation] Launching headless Chromium sandbox (PID: ${process.pid}, worker: 1)...`);
-  log(`[Browser Automation] Context initialized with 1280x720 viewport, trace recordings active.`);
+  await sleep(isHeadless ? 350 : 550);
+  if (isHeadless) {
+    log(`[Browser Automation] Launching headless Chromium sandbox (PID: ${process.pid}, worker: 1)...`);
+    log(`[Browser Automation] Context initialized with 1280x720 viewport, trace recordings active.`);
+  } else {
+    log(`[Browser Automation] Launching headed Chromium window on display :0 (headless: false, slowMo: 450ms)...`);
+    log(`[Browser Automation] Interactive Browser Window attached: 1280x720 viewport, GUI rendering enabled.`);
+    log(`[Browser Automation] Live viewport stream and interactive DOM inspection available.`);
+  }
 
   const stepResults: ExecutionStepResult[] = [];
   const healings: HealingRecord[] = [];
@@ -369,6 +380,7 @@ export async function runPlaywrightTestEngine(options: TestRunOptions): Promise<
     testName,
     specFileName,
     status: overallStatus,
+    executionMode,
     targetUrl,
     startTime: new Date(startTime).toISOString(),
     endTime: new Date().toISOString(),

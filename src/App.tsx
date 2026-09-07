@@ -29,6 +29,9 @@ import {
   Wrench,
   Activity,
   Zap,
+  Monitor,
+  ExternalLink,
+  Eye,
 } from 'lucide-react';
 
 export default function App() {
@@ -46,6 +49,7 @@ export default function App() {
   const [isApproving, setIsApproving] = useState(false);
   const [isGeneratingCode, setIsGeneratingCode] = useState(false);
   const [isRunningTest, setIsRunningTest] = useState(false);
+  const [browserExecutionMode, setBrowserExecutionMode] = useState<'headless' | 'headed'>('headed');
   const [activeViewTab, setActiveViewTab] = useState<'plan' | 'code' | 'execution'>('plan');
   const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [isSetupOpen, setIsSetupOpen] = useState(false);
@@ -355,11 +359,20 @@ export default function App() {
     }
   };
 
-  // Phase 3 Runtime: Trigger headless Playwright test execution with Self-Healing Loop
-  const handleRunHeadlessTest = async (options?: { simulateFailure?: boolean; selfHealing?: boolean }) => {
+  // Phase 3 Runtime: Trigger Playwright test execution (Headless or Headed / View Browser) with Self-Healing Loop
+  const handleRunTest = async (options?: {
+    simulateFailure?: boolean;
+    selfHealing?: boolean;
+    headless?: boolean;
+  }) => {
     if (!activeJob) return;
     setIsRunningTest(true);
     setActiveViewTab('execution');
+
+    const effectiveHeadless =
+      options?.headless !== undefined
+        ? options.headless
+        : browserExecutionMode === 'headless';
 
     try {
       subscribeToJobStream(activeJob.id);
@@ -372,6 +385,7 @@ export default function App() {
           targetUrl: activeJob.targetUrl,
           selfHealingEnabled: options?.selfHealing !== false,
           simulateFailureScenario: options?.simulateFailure === true,
+          headless: effectiveHeadless,
           specFilePath: activeJob.generatedCode?.filePath,
           specCode: activeJob.generatedCode?.code,
           llmConfig,
@@ -467,6 +481,9 @@ export default function App() {
       setIsRunningTest(false);
     }
   };
+
+  const handleRunHeadlessTest = (options?: { simulateFailure?: boolean; selfHealing?: boolean; headless?: boolean }) =>
+    handleRunTest(options);
 
   // Phase 2: Save manual edits to generated code
   const handleSaveCodeEdit = async (newCode: string) => {
@@ -703,10 +720,60 @@ export default function App() {
 
           {/* Quick Header Execution Controls */}
           {activeJob && (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Browser Mode Selector Toggle */}
+              <div className="flex items-center bg-slate-900 border border-slate-800 rounded-xl p-0.5 text-xs font-mono">
+                <button
+                  type="button"
+                  onClick={() => setBrowserExecutionMode('headless')}
+                  className={`px-2.5 py-1 rounded-lg flex items-center gap-1.5 transition-all ${
+                    browserExecutionMode === 'headless'
+                      ? 'bg-slate-800 text-slate-100 shadow-sm border border-slate-700 font-semibold'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                  title="Headless Mode: executes in background without visible GUI"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                  <span>Headless</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setBrowserExecutionMode('headed')}
+                  className={`px-2.5 py-1 rounded-lg flex items-center gap-1.5 transition-all ${
+                    browserExecutionMode === 'headed'
+                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm font-semibold'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                  title="Headed Mode: View live interactive browser viewport in real time"
+                >
+                  <Monitor className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>View Browser (Headed)</span>
+                </button>
+              </div>
+
+              {/* Standalone Window Launcher Button */}
+              {activeJob.targetUrl && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    window.open(
+                      activeJob.targetUrl,
+                      'PlaywrightTargetBrowser',
+                      'width=1280,height=720,menubar=no,toolbar=no,location=yes,status=no'
+                    )
+                  }
+                  className="px-2.5 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-slate-300 border border-slate-700 text-xs font-medium flex items-center gap-1 transition-colors"
+                  title="Open target application in standalone 1280x720 browser window"
+                >
+                  <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
+                  <span className="hidden sm:inline">Launch Browser</span>
+                </button>
+              )}
+
               <button
                 type="button"
-                onClick={() => handleRunHeadlessTest({ simulateFailure: true, selfHealing: true })}
+                onClick={() => handleRunTest({ simulateFailure: true, selfHealing: true })}
                 disabled={isRunningTest}
                 className="px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-semibold flex items-center gap-1.5 transition-colors"
                 title="Simulate an outdated selector to trigger autonomous Healer Agent repair in real-time"
@@ -717,14 +784,23 @@ export default function App() {
 
               <button
                 type="button"
-                onClick={() => handleRunHeadlessTest({ selfHealing: true })}
+                onClick={() => handleRunTest({ selfHealing: true })}
                 disabled={isRunningTest}
-                className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm shadow-emerald-600/20"
+                className={`px-3.5 py-1.5 rounded-xl disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm ${
+                  browserExecutionMode === 'headed'
+                    ? 'bg-cyan-600 hover:bg-cyan-500 shadow-cyan-600/25'
+                    : 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/20'
+                }`}
               >
                 {isRunningTest ? (
                   <>
                     <div className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                    <span>Executing...</span>
+                    <span>Executing ({browserExecutionMode === 'headed' ? 'Headed' : 'Headless'})...</span>
+                  </>
+                ) : browserExecutionMode === 'headed' ? (
+                  <>
+                    <Monitor className="w-3.5 h-3.5 text-cyan-200" />
+                    <span>Run Headed (View Browser)</span>
                   </>
                 ) : (
                   <>
@@ -746,7 +822,9 @@ export default function App() {
               jobId={activeJob?.id}
               targetUrl={activeJob?.targetUrl || 'https://example.com'}
               isRunning={isRunningTest}
-              onRunTest={handleRunHeadlessTest}
+              browserMode={browserExecutionMode}
+              onToggleBrowserMode={setBrowserExecutionMode}
+              onRunTest={handleRunTest}
               onViewSpec={() => setActiveViewTab('code')}
               onViewLogs={() => {
                 setActiveViewTab('plan');
@@ -873,7 +951,9 @@ export default function App() {
                       targetUrl={activeJob.targetUrl}
                       isGenerating={isGeneratingCode}
                       isRunningTest={isRunningTest}
-                      onRunTest={handleRunHeadlessTest}
+                      browserMode={browserExecutionMode}
+                      onToggleBrowserMode={setBrowserExecutionMode}
+                      onRunTest={handleRunTest}
                       onSaveCode={handleSaveCodeEdit}
                       onRegenerate={() =>
                         handleGenerateCode(

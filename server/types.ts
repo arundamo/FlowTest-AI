@@ -94,6 +94,7 @@ export interface TestExecutionReport {
   testName: string;
   specFileName: string;
   status: 'passed' | 'failed' | 'healed';
+  executionMode?: 'headless' | 'headed';
   targetUrl: string;
   startTime: string;
   endTime: string;
